@@ -1,0 +1,182 @@
+@import 'tailwindcss';
+
+@source '../../vendor/laravel/framework/src/Illuminate/Pagination/resources/views/*.blade.php';
+@source '../../storage/framework/views/*.php';
+
+@theme {
+    --font-sans: 'Instrument Sans', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji',
+        'Segoe UI Symbol', 'Noto Color Emoji';
+
+    --color-ink-50: #f6f7fb;
+    --color-ink-100: #eceef6;
+    --color-ink-200: #d9ddeb;
+    --color-ink-300: #b6bdd3;
+    --color-ink-400: #8a94b3;
+    --color-ink-500: #667092;
+    --color-ink-600: #4c5677;
+    --color-ink-700: #39425e;
+    --color-ink-800: #232b44;
+    --color-ink-900: #151c31;
+    --color-ink-950: #0b1020;
+
+    --color-brand-50: #eefbf6;
+    --color-brand-100: #d5f5e9;
+    --color-brand-200: #aeead6;
+    --color-brand-300: #7bd9bd;
+    --color-brand-400: #45c19f;
+    --color-brand-500: #1fa585;
+    --color-brand-600: #11856c;
+    --color-brand-700: #0f6a59;
+    --color-brand-800: #105548;
+    --color-brand-900: #0f463d;
+
+    --shadow-soft: 0 1px 2px rgb(15 23 42 / 0.04), 0 12px 32px -12px rgb(15 23 42 / 0.18);
+}
+
+@layer base {
+    html {
+        scroll-behavior: smooth;
+    }
+
+    body {
+        @apply bg-ink-50 text-ink-800 antialiased;
+    }
+
+    ::selection {
+        @apply bg-brand-200 text-ink-900;
+    }
+}
+
+@layer components {
+    .card {
+        @apply rounded-2xl border border-ink-200/70 bg-white shadow-[0_1px_2px_rgb(15_23_42/0.04),0_12px_32px_-18px_rgb(15_23_42/0.25)];
+    }
+
+    .nav-link {
+        @apply flex items-center gap-3 rounded-xl px-3.5 py-2.5 text-sm font-medium text-ink-500 transition hover:bg-ink-100 hover:text-ink-800;
+    }
+
+    .nav-link-active {
+        @apply bg-ink-900 text-white shadow-sm hover:bg-ink-900 hover:text-white;
+    }
+
+    .btn,
+    .btn-primary,
+    .btn-brand,
+    .btn-ghost,
+    .btn-soft {
+        @apply inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold transition focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-400 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60;
+    }
+
+    .btn-primary {
+        @apply bg-ink-900 text-white hover:bg-ink-800 active:scale-[0.99];
+    }
+
+    .btn-brand {
+        @apply bg-brand-600 text-white hover:bg-brand-700 active:scale-[0.99];
+    }
+
+    .btn-ghost {
+        @apply border border-ink-200 bg-white text-ink-700 hover:border-ink-300 hover:bg-ink-50;
+    }
+
+    .btn-soft {
+        @apply bg-ink-100 text-ink-700 hover:bg-ink-200;
+    }
+
+    .chip {
+        @apply inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-semibold;
+    }
+
+    .label-form {
+        @apply mb-1.5 block text-xs font-semibold uppercase tracking-wide text-ink-500;
+    }
+
+    .input-form {
+        @apply w-full rounded-xl border border-ink-200 bg-white px-3.5 py-2.5 text-sm text-ink-800 shadow-sm transition placeholder:text-ink-400 focus:border-brand-400 focus:outline-none focus:ring-2 focus:ring-brand-100;
+    }
+
+    .dropzone {
+        @apply relative flex min-h-64 cursor-pointer flex-col items-center justify-center overflow-hidden rounded-2xl border-2 border-dashed border-ink-200 bg-ink-50/60 px-6 py-8 text-center transition hover:border-brand-300 hover:bg-brand-50/40;
+    }
+
+    .dropzone.dragover {
+        @apply border-brand-400 bg-brand-50 ring-4 ring-brand-100;
+    }
+
+    .dropzone.punya-gambar {
+        @apply border-solid border-ink-200 bg-ink-900 p-0;
+    }
+
+    .stat-icon {
+        @apply flex h-11 w-11 items-center justify-center rounded-xl;
+    }
+
+    .skeleton {
+        @apply animate-pulse rounded-lg bg-ink-100;
+    }
+
+    .table-head {
+        @apply bg-ink-50/80 text-left text-[11px] font-semibold uppercase tracking-wider text-ink-500;
+    }
+
+    .anim-masuk {
+        animation: masuk 0.4s cubic-bezier(0.16, 1, 0.3, 1) both;
+    }
+
+    .anim-naik {
+        animation: naik 0.35s cubic-bezier(0.16, 1, 0.3, 1) both;
+    }
+}
+
+@keyframes masuk {
+    from {
+        opacity: 0;
+    }
+
+    to {
+        opacity: 1;
+    }
+}
+
+@keyframes naik {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+@keyframes denyut {
+    0%,
+    100% {
+        opacity: 1;
+    }
+
+    50% {
+        opacity: 0.35;
+    }
+}
+
+.denyut {
+    animation: denyut 1.4s ease-in-out infinite;
+}
+
+/* Scrollbar tipis untuk galeri contoh & tabel */
+.scroll-tipis::-webkit-scrollbar {
+    height: 6px;
+    width: 6px;
+}
+
+.scroll-tipis::-webkit-scrollbar-thumb {
+    border-radius: 999px;
+    background: #d9ddeb;
+}
+
+.scroll-tipis::-webkit-scrollbar-track {
+    background: transparent;
+}
