@@ -44,9 +44,11 @@ class Prediksi extends Model
 
     public function getGambarUrlAttribute(): ?string
     {
-        return $this->gambar
-            ? Storage::disk('public')->url($this->gambar)
-            : null;
+        if (! $this->gambar) {
+            return null;
+        }
+
+        return asset('storage/' . ltrim($this->gambar, '/'));
     }
 
     public function getConfidencePersenAttribute(): float
