@@ -5,3 +5,7 @@ opencv-python>=4.10
 Pillow>=10.4
 scikit-image>=0.24
 scikit-learn>=1.5
+# Baca nomor (baca_nomor.py) TIDAK butuh paket pip tambahan:
+# QR/barcode memakai detektor bawaan OpenCV, OCR memakai binary
+# `tesseract` yang diinstall di sistem (Windows: installer
+# tesseract-ocr + Add to PATH; Linux: apt install tesseract-ocr).

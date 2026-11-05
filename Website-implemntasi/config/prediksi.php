@@ -22,6 +22,7 @@ return [
 
     'classes' => [
         'ada_resi' => 'Ada Resi',
+        'bukan_resi' => 'Bukan Resi',
         'tidak_ada_resi' => 'Tidak Ada Resi',
     ],
 

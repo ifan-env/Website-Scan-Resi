@@ -18,10 +18,14 @@ class Prediksi extends Model
         'nama_kelas',
         'confidence',
         'prob_ada_resi',
+        'prob_bukan_resi',
         'prob_tidak_ada_resi',
         'waktu_proses_ms',
         'jumlah_fitur',
         'label_dataset',
+        'nomor_resi',
+        'metode_baca',
+        'label_ketemu',
     ];
 
     protected function casts(): array
@@ -29,9 +33,11 @@ class Prediksi extends Model
         return [
             'confidence' => 'float',
             'prob_ada_resi' => 'float',
+            'prob_bukan_resi' => 'float',
             'prob_tidak_ada_resi' => 'float',
             'waktu_proses_ms' => 'integer',
             'jumlah_fitur' => 'integer',
+            'label_ketemu' => 'boolean',
             'created_at' => 'datetime',
         ];
     }
@@ -65,11 +71,15 @@ class Prediksi extends Model
             'kepercayaan' => round($this->confidence, 4),
             'probabilitas' => [
                 'ada_resi' => round($this->prob_ada_resi, 4),
+                'bukan_resi' => round($this->prob_bukan_resi, 4),
                 'tidak_ada_resi' => round($this->prob_tidak_ada_resi, 4),
             ],
             'waktu_proses_detik' => round($this->waktu_proses_ms / 1000, 3),
             'jumlah_fitur' => $this->jumlah_fitur,
             'label_dataset' => $this->label_dataset,
+            'nomor_resi' => $this->nomor_resi,
+            'metode_baca' => $this->metode_baca,
+            'label_ketemu' => $this->label_ketemu,
             'sumber' => $this->sumber,
             'gambar_url' => $this->gambar_url,
             'dibuat_pada' => $this->created_at?->toIso8601String(),

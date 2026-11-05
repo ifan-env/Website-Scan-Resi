@@ -18,6 +18,7 @@ class DashboardController extends Controller
         $stats = [
             'total' => Prediksi::count(),
             'ada_resi' => Prediksi::where('label', 'ada_resi')->count(),
+            'bukan_resi' => Prediksi::where('label', 'bukan_resi')->count(),
             'tidak_ada_resi' => Prediksi::where('label', 'tidak_ada_resi')->count(),
             'rata_confidence' => round(((float) Prediksi::avg('confidence')) * 100, 1),
         ];

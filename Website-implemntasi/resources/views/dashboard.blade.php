@@ -9,7 +9,7 @@
 
 @section('content')
     {{-- Kartu statistik --}}
-    <section class="grid grid-cols-2 gap-3.5 xl:grid-cols-4">
+    <section class="grid grid-cols-2 gap-3.5 xl:grid-cols-5">
         <div class="card p-4 sm:p-5">
             <div class="flex items-start justify-between gap-3">
                 <div>
@@ -45,6 +45,19 @@
                 </div>
                 <span class="stat-icon bg-amber-50 text-amber-600">
                     <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><path stroke-linecap="round" d="M8 12h8"/></svg>
+                </span>
+            </div>
+        </div>
+
+        <div class="card p-4 sm:p-5">
+            <div class="flex items-start justify-between gap-3">
+                <div>
+                    <p class="text-[11px] font-semibold uppercase tracking-wider text-ink-400">Bukan resi</p>
+                    <p id="stat-bukan" class="mt-2 text-2xl font-bold tracking-tight text-rose-600 sm:text-3xl">{{ number_format($stats['bukan_resi'], 0, ',', '.') }}</p>
+                    <p class="mt-1 text-[11px] text-ink-400">kertas non-resi terdeteksi</p>
+                </div>
+                <span class="stat-icon bg-rose-50 text-rose-600">
+                    <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M7 3h7l5 5v13a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1Z"/><path stroke-linecap="round" d="M14 3v5h5M9.5 13h6M9.5 17h6"/></svg>
                 </span>
             </div>
         </div>
@@ -218,6 +231,15 @@
                                 <div id="prob-tidak-bar" class="h-full rounded-full bg-amber-500 transition-all duration-700" style="width: 0%"></div>
                             </div>
                         </div>
+                        <div>
+                            <div class="mb-1.5 flex items-center justify-between text-xs">
+                                <span class="font-medium text-ink-600">Bukan Resi</span>
+                                <span id="prob-bukan-teks" class="font-semibold text-ink-800">0%</span>
+                            </div>
+                            <div class="h-2 overflow-hidden rounded-full bg-ink-100">
+                                <div id="prob-bukan-bar" class="h-full rounded-full bg-rose-500 transition-all duration-700" style="width: 0%"></div>
+                            </div>
+                        </div>
                     </div>
 
                     <dl class="mt-5 grid grid-cols-2 gap-2.5">
@@ -236,6 +258,14 @@
                         <div class="rounded-xl border border-ink-100 bg-ink-50/60 px-3 py-2.5">
                             <dt class="text-[10px] font-medium uppercase tracking-wider text-ink-400">Model</dt>
                             <dd class="mt-0.5 text-sm font-semibold text-ink-800">SVM RBF</dd>
+                        </div>
+                        <div class="rounded-xl border border-ink-100 bg-ink-50/60 px-3 py-2.5">
+                            <dt class="text-[10px] font-medium uppercase tracking-wider text-ink-400">Nomor resi terbaca</dt>
+                            <dd id="meta-nomor-resi" class="mt-0.5 break-all text-sm font-semibold text-ink-800">—</dd>
+                        </div>
+                        <div class="rounded-xl border border-ink-100 bg-ink-50/60 px-3 py-2.5">
+                            <dt class="text-[10px] font-medium uppercase tracking-wider text-ink-400">Metode baca nomor</dt>
+                            <dd id="meta-metode-baca" class="mt-0.5 text-sm font-semibold text-ink-800">—</dd>
                         </div>
                     </dl>
 

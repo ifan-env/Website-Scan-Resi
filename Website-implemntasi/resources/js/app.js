@@ -89,6 +89,8 @@ function initDashboard() {
     const probAdaTeks = pilih('#prob-ada-teks');
     const probTidakBar = pilih('#prob-tidak-bar');
     const probTidakTeks = pilih('#prob-tidak-teks');
+    const probBukanBar = pilih('#prob-bukan-bar');
+    const probBukanTeks = pilih('#prob-bukan-teks');
 
     const hasilDataset = pilih('#hasil-dataset');
     const hasilDatasetTeks = pilih('#hasil-dataset-teks');
@@ -173,6 +175,7 @@ function initDashboard() {
         const persen = ((hasil.kepercayaan ?? 0) * 100).toFixed(1).replace('.', ',');
         const probAda = ((hasil.probabilitas?.ada_resi ?? 0) * 100).toFixed(1).replace('.', ',');
         const probTidak = ((hasil.probabilitas?.tidak_ada_resi ?? 0) * 100).toFixed(1).replace('.', ',');
+        const probBukan = ((hasil.probabilitas?.bukan_resi ?? 0) * 100).toFixed(1).replace('.', ',');
 
         hasilIdle?.classList.add('hidden');
         hasilLoading?.classList.add('hidden');
@@ -207,18 +210,24 @@ function initDashboard() {
 
         if (probAdaBar) probAdaBar.style.width = probAda + '%';
         if (probTidakBar) probTidakBar.style.width = probTidak + '%';
+        if (probBukanBar) probBukanBar.style.width = probBukan + '%';
         if (probAdaTeks) probAdaTeks.textContent = probAda + '%';
         if (probTidakTeks) probTidakTeks.textContent = probTidak + '%';
+        if (probBukanTeks) probBukanTeks.textContent = probBukan + '%';
 
         pilih('#meta-waktu').textContent =
             (hasil.waktu_proses_detik ?? 0).toFixed(3).replace('.', ',') + ' detik';
         pilih('#meta-fitur').textContent = Number(hasil.jumlah_fitur ?? 1812).toLocaleString('id-ID');
         pilih('#meta-sumber').textContent = hasil.sumber ?? 'upload';
+        const elNomor = pilih('#meta-nomor-resi');
+        if (elNomor) elNomor.textContent = hasil.nomor_resi ?? 'Tidak terbaca — periksa/koreksi manual';
+        const elMetode = pilih('#meta-metode-baca');
+        if (elMetode) elMetode.textContent = hasil.metode_baca ?? '—';
 
         if (hasilDataset && hasilDatasetTeks) {
             if (hasil.label_dataset) {
                 const benar = hasil.label_dataset === hasil.prediksi;
-                const namaAsli = hasil.label_dataset === 'ada_resi' ? 'Ada Resi' : 'Tidak Ada Resi';
+                const namaAsli = ({ ada_resi: 'Ada Resi', bukan_resi: 'Bukan Resi', tidak_ada_resi: 'Tidak Ada Resi' })[hasil.label_dataset] ?? hasil.label_dataset;
 
                 hasilDataset.className =
                     'mt-3 flex items-start gap-2 rounded-xl border px-3 py-2.5 text-[11px] font-medium ' +
@@ -244,7 +253,8 @@ function initDashboard() {
         };
 
         tambah('stat-total');
-        tambah(hasil.prediksi === 'ada_resi' ? 'stat-ada' : 'stat-tidak');
+        const petaStat = { ada_resi: 'stat-ada', bukan_resi: 'stat-bukan', tidak_ada_resi: 'stat-tidak' };
+        tambah(petaStat[hasil.prediksi] ?? 'stat-tidak');
     };
 
     const tambahTerbaru = (hasil) => {

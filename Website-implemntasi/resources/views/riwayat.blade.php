@@ -89,6 +89,12 @@
                                         Label asli: {{ config('prediksi.classes')[$item->label_dataset] ?? $item->label_dataset }}
                                     </p>
                                 @endif
+                                <p class="mt-1 break-all text-[10px] text-ink-500">
+                                    Nomor: <span class="font-semibold text-ink-700">{{ $item->nomor_resi ?? 'tidak terbaca' }}</span>
+                                    @if ($item->metode_baca)
+                                        ({{ $item->metode_baca }})
+                                    @endif
+                                </p>
                             </td>
                             <td class="px-4 py-3">
                                 <div class="flex items-center gap-2">
@@ -100,6 +106,7 @@
                             </td>
                             <td class="px-4 py-3">
                                 <p class="text-[11px] text-ink-500">Resi: <span class="font-semibold text-ink-700">{{ round($item->prob_ada_resi * 100, 1) }}%</span></p>
+                                <p class="text-[11px] text-ink-500">Bukan: <span class="font-semibold text-ink-700">{{ round($item->prob_bukan_resi * 100, 1) }}%</span></p>
                                 <p class="text-[11px] text-ink-500">Tanpa: <span class="font-semibold text-ink-700">{{ round($item->prob_tidak_ada_resi * 100, 1) }}%</span></p>
                             </td>
                             <td class="px-4 py-3">

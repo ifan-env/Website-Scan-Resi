@@ -1,0 +1,334 @@
+"""
+Service Inference Model SVM — Loker Paket Pintar
+================================================
+Microservice Flask yang memuat model hasil training
+(model_svm_resi.pkl) dan menyediakan endpoint prediksi untuk
+dikonsumsi aplikasi Laravel.
+
+Jalankan:
+    pip install -r requirements.txt
+    python ml_service/app.py
+    -> http://127.0.0.1:5000
+
+Endpoint:
+    GET  /health   cek service + model
+    POST /predict  multipart field "file" atau JSON {"gambar_base64": "..."}
+
+Preprocessing IDENTIK dengan latih_dari_folder.py:
+  RGB -> grayscale -> CLAHE (2.0, 8x8) -> Bilateral (9/75/75)
+  -> resize 64x64 -> HOG (1.764) + histogram RGB (48) = 1.812 fitur.
+
+PATCH baca nomor (2026-11-04): SVM hanya gerbang klasifikasi, ia
+TIDAK bisa membaca nomor. Bila hasil SVM = ada_resi, service
+melanjutkan ke tahap ke-2 (baca_nomor.py, dari deteksi_resi_v2):
+deteksi segi empat label -> warp/deskew -> QR -> barcode -> OCR,
+lalu nomor disaring pola resi. Respons /predict kini menambah:
+  nomor_resi, metode_baca, label_ketemu, teks_baca
+Untuk tidak_ada_resi tahap ke-2 dilewati (nomor_resi = null).
+Matikan tahap ke-2 bila perlu: POST /predict?baca_nomor=0
+
+PATCH baca nomor v2 (2026-11-05): baca_nomor.py diganti versi 2
+(decode foto utuh + pyzbar opsional + OCR multi-percobaan +
+pencocokan toleran). /predict kini menerima daftar resi yang
+ditunggu secara OPSIONAL — JSON {"daftar_resi": ["...", ...]} atau
+form field "daftar_resi" (JSON / pisah koma) — dan bila dikirim,
+respons menambah: nomor_mentah, status_cocok, jarak_cocok, dengan
+nomor_resi berisi nomor RESMI dari daftar (atau null bila tidak
+ada kandidat yang cukup dekat / ambigu). Tanpa daftar_resi,
+perilaku respons sama persis seperti sebelumnya.
+
+PATCH rotasi (2026-11-05, Patch 5): HOG tidak tahan putaran —
+foto label miring/terbalik vektor fiturnya berubah total sehingga
+SVM menolaknya (terukur 1 Nov: foto SPX yang sama skor ada_resi
+0,2422 saat miring, 0,6503 sesudah ditegakkan). prediksi() kini
+mengevaluasi 4 putaran gambar (0/90/180/270, transpose PIL tanpa
+interpolasi) dan memakai putaran dengan probabilitas ada_resi
+tertinggi sebagai putusan; gambar hasil koreksi putaran itulah
+yang diteruskan ke tahap baca nomor. Respons menambah
+rotasi_terbaik dan skor_rotasi. Matikan bila perlu:
+POST /predict?rotasi=0. Model TIDAK diubah dan TIDAK dilatih
+ulang — ini tambalan sisi pemakaian, bukan perbaikan model.
+"""
+
+import base64
+import io
+import json
+import os
+import time
+from pathlib import Path
+
+import cv2
+import joblib
+import numpy as np
+from flask import Flask, jsonify, request
+from PIL import Image
+from skimage.feature import hog
+
+try:
+    from baca_nomor import baca_nomor_dari_gambar
+    BACA_NOMOR_TERSEDIA = True
+    try:
+        from baca_nomor import PYZBAR_TERSEDIA
+    except Exception:
+        PYZBAR_TERSEDIA = False
+except Exception as _e_baca:  # service tetap jalan tanpa tahap ke-2
+    baca_nomor_dari_gambar = None
+    BACA_NOMOR_TERSEDIA = False
+    PYZBAR_TERSEDIA = False
+    print(f"Peringatan: modul baca_nomor tidak bisa dimuat: {_e_baca}")
+
+BASE_DIR = Path(__file__).resolve().parent
+PROJECT_DIR = BASE_DIR.parent
+
+
+def cari_model() -> Path:
+    kandidat = [
+        os.environ.get("MODEL_PATH"),
+        PROJECT_DIR / "projek-semester5" / "model_svm_seri.pkl",
+        PROJECT_DIR / "projek-semester5" / "model_svm_resi.pkl",
+        BASE_DIR / "model_svm_resi.pkl",
+    ]
+    for kandidat_path in kandidat:
+        if kandidat_path and Path(kandidat_path).exists():
+            return Path(kandidat_path)
+    raise FileNotFoundError(
+        "Model .pkl tidak ditemukan. Letakkan model_svm_resi.pkl di folder "
+        "projek-semester5/ atau set environment variable MODEL_PATH."
+    )
+
+
+MODEL_PATH = cari_model()
+_paket = joblib.load(MODEL_PATH)
+MODEL = _paket["model"] if isinstance(_paket, dict) else _paket
+KELAS = (_paket.get("kelas") if isinstance(_paket, dict) else None) \
+    or list(getattr(MODEL, "classes_", []))
+JUMLAH_FITUR = int(getattr(MODEL, "n_features_in_", 1812))
+
+NAMA_TAMPIL = {
+    "ada_resi": "Ada Resi",
+    "bukan_resi": "Bukan Resi",
+    "tidak_ada_resi": "Tidak Ada Resi",
+}
+
+app = Flask(__name__)
+app.config["MAX_CONTENT_LENGTH"] = 10 * 1024 * 1024
+
+
+def fitur_dari_gambar(img_rgb: Image.Image) -> np.ndarray:
+    """PIL RGB -> vektor 1.812 angka (HOG + histogram warna)."""
+    abu = np.asarray(img_rgb.convert("L"))
+    clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
+    olah = cv2.bilateralFilter(clahe.apply(abu), d=9, sigmaColor=75,
+                               sigmaSpace=75)
+    kecil = np.asarray(Image.fromarray(olah).resize((64, 64)),
+                       dtype=float) / 255.0
+    f_hog = hog(kecil, orientations=9, pixels_per_cell=(8, 8),
+                cells_per_block=(2, 2), visualize=False)
+    arr = np.asarray(img_rgb.resize((64, 64)), dtype=float) / 255.0
+    hist = np.concatenate([np.histogram(arr[:, :, c], bins=16,
+                                        range=(0, 1))[0]
+                           for c in range(3)]).astype(float)
+    hist = hist / (hist.sum() + 1e-9)
+    return np.concatenate([f_hog, hist])
+
+
+_TRANSPOSE = {
+    0: None,
+    90: Image.ROTATE_90,
+    180: Image.ROTATE_180,
+    270: Image.ROTATE_270,
+}
+
+
+def _putar(img_rgb: Image.Image, derajat: int) -> Image.Image:
+    """Putar gambar dengan transpose PIL (tanpa interpolasi)."""
+    operasi = _TRANSPOSE[derajat]
+    return img_rgb if operasi is None else img_rgb.transpose(operasi)
+
+
+def _prediksi_satu(img_rgb: Image.Image):
+    """Satu evaluasi model: kembalikan (label, probabilitas, n_fitur)."""
+    X = fitur_dari_gambar(img_rgb).reshape(1, -1)
+    label = str(MODEL.predict(X)[0])
+    probabilitas = {}
+    if hasattr(MODEL, "predict_proba"):
+        for k, p in zip(KELAS, MODEL.predict_proba(X)[0]):
+            probabilitas[str(k)] = round(float(p), 4)
+    elif hasattr(MODEL, "decision_function"):
+        skor = np.atleast_1d(MODEL.decision_function(X))[0]
+        p = 1.0 / (1.0 + np.exp(-float(skor)))
+        for k, nilai in zip(KELAS, [1 - p, p]):
+            probabilitas[str(k)] = round(float(nilai), 4)
+    return label, probabilitas, int(X.shape[1])
+
+
+def prediksi(img_rgb: Image.Image, t0: float, baca_nomor: bool = True,
+             daftar_tunggu=None, rotasi: bool = True) -> dict:
+    # Evaluasi model. Bila rotasi aktif, keempat putaran dicoba dan
+    # putaran dengan probabilitas ada_resi tertinggi yang dipakai —
+    # foto miring/terbalik dinilai pada orientasi terbaiknya, persis
+    # uji_rotasi.py (1 Nov), kini di dalam service.
+    info_rotasi = {}
+    gambar_kerja = img_rgb
+    if rotasi:
+        kandidat = []
+        for derajat in (0, 90, 180, 270):
+            label_r, proba_r, nfitur = _prediksi_satu(_putar(img_rgb, derajat))
+            skor_ada = proba_r.get("ada_resi", 0.0)
+            info_rotasi[str(derajat)] = skor_ada
+            kandidat.append((skor_ada, derajat, label_r, proba_r, nfitur))
+        _, derajat_terbaik, label, probabilitas, jumlah_fitur = max(
+            kandidat, key=lambda k: k[0])
+        info_rotasi_final = {
+            "rotasi_terbaik": derajat_terbaik,
+            "skor_rotasi": info_rotasi,
+        }
+        gambar_kerja = _putar(img_rgb, derajat_terbaik)
+    else:
+        label, probabilitas, jumlah_fitur = _prediksi_satu(img_rgb)
+        info_rotasi_final = {}
+
+    # Tahap ke-2: baca nomor — HANYA bila SVM bilang ada_resi, dan
+    # pada GAMBAR KERJA (yang sudah dikoreksi putarannya) supaya
+    # deteksi label + OCR bekerja pada label tegak.
+    # Kegagalan tahap ini tidak menggagalkan prediksi: nomor = null.
+    nomor = {
+        "nomor_resi": None,
+        "metode_baca": None,
+        "label_ketemu": None,
+        "teks_baca": None,
+    }
+    if label == "ada_resi" and baca_nomor and BACA_NOMOR_TERSEDIA:
+        try:
+            img_bgr = cv2.cvtColor(np.asarray(gambar_kerja), cv2.COLOR_RGB2BGR)
+            hasil_baca = baca_nomor_dari_gambar(img_bgr,
+                                                daftar_tunggu=daftar_tunggu)
+            nomor = {
+                "nomor_resi": hasil_baca.get("nomor_resi"),
+                "metode_baca": hasil_baca.get("metode_baca"),
+                "label_ketemu": hasil_baca.get("label_ketemu"),
+                "teks_baca": hasil_baca.get("teks_baca"),
+            }
+            if daftar_tunggu is not None:
+                nomor.update({
+                    "nomor_mentah": hasil_baca.get("nomor_mentah"),
+                    "status_cocok": hasil_baca.get("status_cocok"),
+                    "jarak_cocok": hasil_baca.get("jarak_cocok"),
+                })
+        except Exception:
+            pass
+
+    return {
+        "prediksi": label,
+        "nama_kelas": NAMA_TAMPIL.get(label, label),
+        "kepercayaan": probabilitas.get(label),
+        "probabilitas": probabilitas,
+        "jumlah_fitur": jumlah_fitur,
+        **info_rotasi_final,
+        **nomor,
+        "waktu_proses_detik": round(time.time() - t0, 3),
+    }
+
+
+@app.get("/")
+def info():
+    return jsonify({
+        "nama": "Service Inference Model SVM — Loker Paket Pintar",
+        "model": MODEL_PATH.name,
+        "kelas": KELAS,
+        "jumlah_fitur": JUMLAH_FITUR,
+        "baca_nomor": BACA_NOMOR_TERSEDIA,
+        "endpoint": {
+            "GET /health": "cek kesiapan service & model",
+            "POST /predict": "upload gambar (field 'file') atau JSON "
+                             "{'gambar_base64': '...'}",
+        },
+    })
+
+
+@app.get("/health")
+def health():
+    return jsonify({
+        "status": "ok",
+        "model": MODEL_PATH.name,
+        "kelas": KELAS,
+        "jumlah_fitur": JUMLAH_FITUR,
+        "baca_nomor": BACA_NOMOR_TERSEDIA,
+        "pyzbar": PYZBAR_TERSEDIA,
+    })
+
+
+@app.post("/predict")
+def predict():
+    t0 = time.time()
+    img = None
+
+    if "file" in request.files and request.files["file"].filename:
+        try:
+            img = Image.open(request.files["file"].stream).convert("RGB")
+        except Exception:
+            return jsonify({"error": "Berkas bukan gambar yang valid."}), 400
+    elif request.is_json and request.json and "gambar_base64" in request.json:
+        try:
+            mentah = base64.b64decode(request.json["gambar_base64"])
+            img = Image.open(io.BytesIO(mentah)).convert("RGB")
+        except Exception:
+            return jsonify({"error": "Data base64 tidak bisa dibaca sebagai "
+                                     "gambar."}), 400
+
+    if img is None:
+        return jsonify({"error": "Kirim gambar lewat form field 'file' atau "
+                                 "JSON 'gambar_base64'."}), 400
+
+    baca_nomor = request.args.get("baca_nomor", "1") != "0"
+    if request.is_json and request.json and "baca_nomor" in request.json:
+        baca_nomor = bool(request.json["baca_nomor"])
+
+    rotasi = request.args.get("rotasi", "1") != "0"
+    if request.is_json and request.json and "rotasi" in request.json:
+        rotasi = bool(request.json["rotasi"])
+
+    # Daftar resi yang ditunggu (opsional): JSON {"daftar_resi": [...]}
+    # atau form field "daftar_resi" berisi JSON / daftar pisah koma.
+    daftar_tunggu = None
+    mentah_daftar = None
+    if request.is_json and request.json and "daftar_resi" in request.json:
+        mentah_daftar = request.json["daftar_resi"]
+    elif "daftar_resi" in request.form:
+        mentah_daftar = request.form["daftar_resi"]
+    if isinstance(mentah_daftar, list):
+        daftar_tunggu = [str(x) for x in mentah_daftar]
+    elif isinstance(mentah_daftar, str) and mentah_daftar.strip():
+        try:
+            parsed = json.loads(mentah_daftar)
+            daftar_tunggu = ([str(x) for x in parsed]
+                             if isinstance(parsed, list) else None)
+        except Exception:
+            daftar_tunggu = None
+        if daftar_tunggu is None:
+            daftar_tunggu = [s.strip() for s in
+                             mentah_daftar.replace("\n", ",").split(",")
+                             if s.strip()]
+
+    try:
+        return jsonify(prediksi(img, t0, baca_nomor=baca_nomor,
+                                daftar_tunggu=daftar_tunggu, rotasi=rotasi))
+    except Exception as e:
+        return jsonify({"error": f"Gagal memproses gambar: {e}"}), 422
+
+
+@app.errorhandler(413)
+def terlalu_besar(_):
+    return jsonify({"error": "Ukuran gambar melebihi 10 MB."}), 413
+
+
+if __name__ == "__main__":
+    port = int(os.environ.get("ML_PORT", "5000"))
+    print("=" * 62)
+    print(" Service Inference — Loker Paket Pintar")
+    print(f" Model : {MODEL_PATH}")
+    print(f" Kelas : {KELAS}")
+    print(f" Fitur : {JUMLAH_FITUR}")
+    print(f" URL   : http://127.0.0.1:{port}")
+    print("=" * 62)
+    app.run(host="127.0.0.1", port=port, debug=False)

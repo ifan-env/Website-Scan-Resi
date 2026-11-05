@@ -98,10 +98,16 @@ class PrediksiService
                 ?? $label,
             'confidence' => (float) ($hasil['kepercayaan'] ?? 0),
             'prob_ada_resi' => (float) ($probabilitas['ada_resi'] ?? 0),
+            'prob_bukan_resi' => (float) ($probabilitas['bukan_resi'] ?? 0),
             'prob_tidak_ada_resi' => (float) ($probabilitas['tidak_ada_resi'] ?? 0),
             'waktu_proses_ms' => (int) round(((float) ($hasil['waktu_proses_detik'] ?? 0)) * 1000),
             'jumlah_fitur' => (int) ($hasil['jumlah_fitur'] ?? 1812),
             'label_dataset' => $labelDataset,
+            'nomor_resi' => $hasil['nomor_resi'] ?? null,
+            'metode_baca' => $hasil['metode_baca'] ?? null,
+            'label_ketemu' => isset($hasil['label_ketemu'])
+                ? (bool) $hasil['label_ketemu']
+                : null,
         ]);
     }
 }
